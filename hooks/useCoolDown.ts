@@ -7,7 +7,6 @@ export interface CoolDownParams {
   onCoolDown?: () => void;
   depend?: {
     localStorage?: any;
-    setTimeout?: any;
   };
 }
 
@@ -83,7 +82,7 @@ export default ({
   }
 
   const [remaining, setRemaining] = useState(init),
-    timer = useRef<number>(),
+    timer = useRef<NodeJS.Timeout>(),
     cooling = remaining !== count;
 
   useEffect(() => {
@@ -105,40 +104,66 @@ export default ({
     const n = pre - step;
     if (n <= 0) {
       stop();
-      reset();
       onCoolDown?.();
     } else {
       setRemaining(n);
-      timer.current = depend.setTimeout(() => loop(n), interval);
+      timer.current = setTimeout(() => loop(n), interval);
     }
   }
+
+  const tools = { start, stop, reset,pause, restart };
 
   function start() {
     if (timer.current === void 0) {
       if (isPersistence) {
         setCoolDown(persistenceKey, remaining, Date.now() + (remaining / step) * interval);
       }
-      loop(remaining);
+      loop(init);
     }
+    return tools;
   }
 
-  function stop() {
+  function pause(){
     clearTimeout(timer.current);
     timer.current = void 0;
     if (isPersistence && cooling) {
       const [, endAt] = getCoolDown(persistenceKey);
       setCoolDown(persistenceKey, remaining, endAt, STATUS.STOP);
     }
+    return tools;
+  }
+
+  function renew(){
+    if (timer.current === void 0) {
+      if (isPersistence) {
+        setCoolDown(persistenceKey, remaining, Date.now() + (remaining / step) * interval);
+      }
+      loop(remaining);
+    }
+    return tools;
+  }
+
+  function stop() {
+    pause();
+    reset();
+    return tools;
   }
 
   function reset(c = count) {
+    if (timer.current !== void 0) console.warn('you need stop first')
     const safeCount = Number.isNaN(Number(c)) ? count : c;
-    setRemaining(safeCount);
+    setRemaining(() => safeCount);
     if (isPersistence && cooling) {
       const [, , status] = getCoolDown(persistenceKey);
       setCoolDown(persistenceKey, safeCount, Date.now() + (safeCount / step) * interval, status);
     }
+    return tools;
   }
 
-  return { remaining, start, reset, stop, cooling };
+  function restart() {
+    start()
+    return tools;
+  }
+
+  return { remaining, start, reset, stop, pause, renew, restart, cooling };
 };
