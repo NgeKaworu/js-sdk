@@ -30,6 +30,12 @@ export default ({
   onCoolDown,
   depend = window,
 }: CoolDownParams) => {
+
+  const onCoolDownRef = useRef(onCoolDown);
+  useEffect(() => {
+    onCoolDownRef.current = onCoolDown;
+  }, [onCoolDown])
+
   let localStorage = depend.localStorage,
     decodeCoolDown: any = null,
     setCoolDown: any = null,
@@ -104,26 +110,25 @@ export default ({
     const n = pre - step;
     if (n <= 0) {
       stop();
-      onCoolDown?.();
+      onCoolDownRef?.current?.();
     } else {
       setRemaining(n);
       timer.current = setTimeout(() => loop(n), interval);
     }
   }
+  const tools = { start, stop, reset, pause, restart };
 
-  const tools = { start, stop, reset,pause, restart };
-
-  function start() {
+  function start(c = count) {
     if (timer.current === void 0) {
       if (isPersistence) {
         setCoolDown(persistenceKey, remaining, Date.now() + (remaining / step) * interval);
       }
-      loop(init);
+      loop(c);
     }
     return tools;
   }
 
-  function pause(){
+  function pause() {
     clearTimeout(timer.current);
     timer.current = void 0;
     if (isPersistence && cooling) {
@@ -133,7 +138,7 @@ export default ({
     return tools;
   }
 
-  function renew(){
+  function renew() {
     if (timer.current === void 0) {
       if (isPersistence) {
         setCoolDown(persistenceKey, remaining, Date.now() + (remaining / step) * interval);
@@ -144,9 +149,7 @@ export default ({
   }
 
   function stop() {
-    pause();
-    reset();
-    return tools;
+    return pause().reset();
   }
 
   function reset(c = count) {
@@ -160,9 +163,8 @@ export default ({
     return tools;
   }
 
-  function restart() {
-    start()
-    return tools;
+  function restart(c = count) {
+    return stop().start(c);
   }
 
   return { remaining, start, reset, stop, pause, renew, restart, cooling };
